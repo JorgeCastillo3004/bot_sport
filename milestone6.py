@@ -95,45 +95,47 @@ def get_player_data(driver):
 	 'player_photo':player_photo, 'player_position':player_position}
 	return player_dict
 
-def get_squad_dict(driver, sport_id = 'soccer'):
-	# Function to get positions and url for each player
-	class_name = '//div[@class="lineup lineup--{}"]'.format(sport_id.lower())
-	print("class_name: ", class_name)
-	lineups_blocks = driver.find_element(By.XPATH, class_name)
-	sections = lineups_blocks.find_elements(By.CLASS_NAME, 'lineup__rows')
+def get_squad_list(driver, sport_id = 'barketball'):
+    if sport_id.lower() == 'football':
+        sport_id = 'soccer'
+    else:
+        sport_id = sport_id.lower()
+    # Function to get positions and url for each player
+    class_name = '//div[@class="lineup lineup--{}"]'.format(sport_id)
+    print("class_name: ", class_name)
+    lineups_blocks = driver.find_element(By.XPATH, class_name)
 
-	dict_squad = {}
-	for section in sections:
-		position = section.find_element(By.CLASS_NAME, 'lineup__title').text
-		players = section.find_elements(By.CLASS_NAME, 'lineup__cell.lineup__cell--name')
-		list_links = []
-		for player in players:        
-			list_links.append(player.get_attribute('href'))
-		dict_squad[position] = list_links    
+    player_links = lineups_blocks.find_elements(By.XPATH, './/a[@class="lineup__cell lineup__cell--name"]')
 
-	return dict_squad
+    player_links = [link.get_attribute('href') for link in player_links]
+    return player_links
 
-def navigate_through_players(driver, sport_id, country_league, team_name, season_id, team_id, dict_squad, dict_players_ready):
+def navigate_through_players(driver, sport_id, country_league, team_name, season_id, team_id, list_squad, dict_players_ready):
 	players_ready = dict_players_ready[sport_id][country_league][team_name]
 
-	for position, list_links in dict_squad.items():
-		for player_link in list_links: ### URGENT DELETE #######
-			wait_update_page(driver, player_link, 'container__heading')
-			player_dict = get_player_data(driver)			
-			player_dict['season_id'] = season_id
-			player_dict['team_id'] = team_id
-			player_dict['player_meta'] = ''			
-			print("Save player info in database")
-			name_ = player_dict['player_country'] + '_' + player_dict['player_name']
-			if not name_ in players_ready:
-				players_ready.append(name_)
-				if database_enable:
-					save_player_info(player_dict) # player
-					save_team_players_entity(player_dict) # team_players_entity
-					dict_players_ready[sport_id][country_league][team_name] = players_ready
-					save_check_point('check_points/players_ready.json', dict_players_ready)
-		# 	break
-		# break
+	for player_link in list_squad:
+		wait_update_page(driver, player_link, 'container__heading')
+		player_dict = get_player_data(driver)			
+		player_dict['season_id'] = season_id
+		player_dict['team_id'] = team_id
+		player_dict['player_meta'] = ''			
+		print("Save player info in database")
+		# name_ = player_dict['player_country'] + '_' + player_dict['player_name']
+		print(player_dict)
+		print("Input name: ", player_dict['player_name'])
+		player_dict['player_name'] = player_dict['player_name'].replace("'", " ")
+		print("out name: ", player_dict['player_name'])
+		players_ready = check_player_duplicates(player_dict['player_country'], player_dict['player_name'], player_dict['player_dob'])
+		print("players_ready ", players_ready)
+		if len(players_ready) == 0:
+			# players_ready.append(name_)
+			if database_enable:
+				save_player_info(player_dict) # player
+				save_team_players_entity(player_dict) # team_players_entity
+				# dict_players_ready[sport_id][country_league][team_name] = players_ready
+				# save_check_point('check_points/players_ready.json', dict_players_ready)
+	# 	break
+	# break
 
 def get_check_point(dict_players_ready, sport_id, country_league, team_name):
 	if sport_id in list(dict_players_ready.keys()):
@@ -153,6 +155,8 @@ def get_check_point(dict_players_ready, sport_id, country_league, team_name):
 
 def players(driver):
 	sports_dict = load_check_point('check_points/leagues_info.json')
+	dict_sport_id = load_check_point('check_points/sports_id.json')
+	inverted_dict = {value: key for key, value in dict_sport_id.items()}
 	dict_players_ready = load_check_point('check_points/players_ready.json')
 	for sport_id, sport_dict in sports_dict.items():	
 		for country_league, country_league_urls in sport_dict.items():			
@@ -173,10 +177,12 @@ def players(driver):
 						squad_button = driver.find_element(By.XPATH, '//a[@title="Squad"]')
 					squad_url = squad_button.get_attribute('href')
 					wait_update_page(driver, squad_url, 'heading')
-					dict_squad = get_squad_dict(driver, sport_id = sport_id)
+					# sport_name = inverted_dict[sport_id]
+					print("squad_url URL: ", squad_url)
+					list_squad = get_squad_list(driver, sport_id = sport_id)
 					dict_players_ready = get_check_point(dict_players_ready, sport_id, country_league, team_name)
 					navigate_through_players(driver, sport_id, country_league, team_name, country_league_urls['season_id'],\
-										 team_info['team_id'], dict_squad, dict_players_ready)
+										 team_info['team_id'], list_squad, dict_players_ready)
 
 CONFIG = load_json('check_points/CONFIG.json')
 database_enable = CONFIG['DATA_BASE']

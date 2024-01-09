@@ -65,6 +65,12 @@ def get_sports_links(driver):
 	
 	return dict_links
 
+def create_sport_dict(sport_mode, sport_name):
+	sport_id = random_id_short()
+	sport_dict = {'sport_id' : sport_id, 'is_active' : True, 'desc_i18n' : '', 'logo' : '',\
+	'sport_mode' : sport_mode, 'name_i18n' : '', 'point_name': '', 'name':sport_name}
+	return sport_dict, sport_id
+
 def click_news(driver):
 	wait = WebDriverWait(driver, 10)
 	newsbutton = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'tabs__tab.news')))  # "tabs__tab news selected"
@@ -77,19 +83,19 @@ def check_pin(driver):
 	else:
 		return False
 
-def get_league_data(driver):
+def get_league_data(driver, league_team, sport_id):
 	block_ligue_team = driver.find_element(By.CLASS_NAME, 'container__heading')
 	sport = block_ligue_team.find_element(By.XPATH, './/h2[@class= "breadcrumb"]/a[1]').text
 	league_country = block_ligue_team.find_element(By.XPATH, './/h2[@class= "breadcrumb"]/a[2]').text
 	league_name = block_ligue_team.find_element(By.CLASS_NAME,'heading__title').text
 	season_name = block_ligue_team.find_element(By.CLASS_NAME, 'heading__info').text
 	image_url = block_ligue_team.find_element(By.XPATH, './/div[@class= "heading"]/img').get_attribute('src')
-	image_path = random_name(folder = 'images/logos/')
+	image_path = random_name_logos(league_team, folder = 'images/logos/')
 	save_image(driver, image_url, image_path)
 	image_path = image_path.replace('images/logos/','')
 	league_id = random_id()
-	season_id = random_id()
-	ligue_tornamen = {"league_id":league_id,"season_id":season_id, 'sport':sport, 'league_country': league_country,
+	season_id = random_id()	
+	ligue_tornamen = {"sport_id":sport_id,"league_id":league_id,"season_id":season_id, 'sport':sport, 'league_country': league_country,
 					 'league_name': league_name,'season_name':season_name, 'league_logo':image_path,
 					  'league_name_i18n':'', 'season_end':datetime.now(), 'season_start':datetime.now()}
 	return ligue_tornamen
@@ -295,46 +301,71 @@ def get_sections_links(driver):
 
 def create_leagues(driver, flag_news = False):
 	dict_sports = load_json('check_points/sports_url_m2.json')
+	dict_sport_id = get_dict_sport_id()
 	conf_enable_sport = check_previous_execution(file_path = 'check_points/CONFIG_M2.json')	
-	json_check_point = {}
-	for sport, sport_info in conf_enable_sport.items():
+	dict_sport_info = load_check_point('check_points/leagues_info.json')
+	print("dict_sport_info: ", dict_sport_info)
+	for sport_name, sport_info in conf_enable_sport.items():
 		if sport_info['enable']:
-			if database_enable:
-				sport_dict = create_sport_dict(sport, sport_info['mode'])
-				save_sport_database(sport_dict)
-			print("Init: ", sport, dict_sports[sport])
-			wait_update_page(driver, dict_sports[sport], "container__heading")
-			
+			###################################################################
+			#				SECTION GET SPORT ID 							  #
+			###################################################################
+			if not sport_name in dict_sport_id.keys():				
+				sport_dict, sport_id = create_sport_dict(sport_info['mode'], sport_name)
+				if database_enable:					
+					save_sport_database(sport_dict)
+			else:
+				sport_id = dict_sport_id[sport_name]				
+			###################################################################
+			#		GET DICT WITH LEAGUES SAVED IN DATA_BASE 				  #
+			#		'{ sport_id _ league_country _ league_name : league_id}   #
+			#																  #
+			dict_leagues_ready = get_dict_results(table= 'league', column = 'sport_id, league_country, league_name, league_id')
+			print("#"*50, '\n', dict_leagues_ready, '\n', "#"*50, '\n')
+			###################################################################
+			#				SECTION GET CURRENT LEAGUES						  #
+			###################################################################
+			print("SPORT NAME: ", sport_name)
+			wait_update_page(driver, dict_sports[sport_name], "container__heading")			
 			dict_leagues_tornaments = find_ligues_torneos(driver)			
-			dict_leagues_ready = get_dict_results(table= 'league', column = 'league_country, league_name, league_id')# From database
-			print("#"*50)
-			print(dict_leagues_ready)
-			print("#"*50)
-			# dict_leagues_ready = {}
-			league_check_point = {}
+
+			###################################################################
+			#		CHECK IF SPORT WAS SAVED PREVIOUSLY						  #
+			###################################################################
+			if sport_name in list(dict_sport_info.keys()):
+				dict_leagues_ready = dict_sport_info[sport_name]
+			else:
+				dict_leagues_ready = {}			
 			count_league = 1			
 			for league_name_url, league_url in dict_leagues_tornaments.items():
-				print("***", league_name_url,"***", " "*(50-len(league_name_url)), count_league, "/" ,len(dict_leagues_tornaments), end = '')
+				print("***", league_name_url,"***", " "*(50-len(league_name_url)), count_league, "/" ,len(dict_leagues_tornaments))
 				wait_update_page(driver, league_url, "container__heading")
 				count_league += 1
-				pin_activate = check_pin(driver)
+				pin_activate = check_pin(driver) # CHECK PIN ACTIVE.
 				if pin_activate:
-					league_info = get_league_data(driver)
-					country_league = league_info['league_country'] +'_'+ league_info['league_name']
-					if country_league in list(dict_leagues_ready.keys()):
-						print(" "*30," READY")							
-						league_id = dict_leagues_ready[country_league]
-						league_info['league_id'] = league_id
+					league_info = get_league_data(driver, league_name_url, sport_id)
+					sport_leag_countr_name = sport_name +"_"+ league_info['league_country'] +'_'+ league_info['league_name']
+					print(sport_leag_countr_name, end = '')
+					###################################################################
+					#			SECTION CHECK LEAGUE SAVED PREVIUSLY				  #
+					###################################################################
+					if sport_leag_countr_name in list(dict_leagues_ready.keys()):
+						enable_save = False
+						print(" "*(60-len(sport_leag_countr_name))," READY")							
+						league_id = dict_leagues_ready[sport_leag_countr_name]['league_id']
+						# league_info['league_id'] = league_id						
 					else:
-						print(" "*30, " NEW LEAGUE")
-						if database_enable:
-							save_league_info(league_info) # UNCOMENT
-							# save_tournament(dict_tournament) # UNCOMENT
+						enable_save = True
+						print(" "*(60-len(sport_leag_countr_name)), " NEW LEAGUE")
 						league_id = league_info['league_id']
+						if database_enable:							
+							save_league_info(league_info) # UNCOMENT
 
 					print(" "*30, "League_id: ", league_id)
-					season_name = league_info['season_name']					
-					list_seasons = get_list_results(league_id, season_name)
+					###################################################################
+					#			SECTION CHECK SEASON SAVED PREVIUSLY				  #
+					###################################################################
+					list_seasons = get_seasons(league_id, league_info['season_name'])
 					# list_seasons = [] # UNCOMENT
 					print("list_seasons: ", list_seasons)
 					
@@ -342,16 +373,22 @@ def create_leagues(driver, flag_news = False):
 						print(" "*30, "SAVE NEW SEASON", league_info['season_id'])
 						if database_enable:
 							save_season_database(league_info) # UNCOMENT
-					league_check_point[country_league] = {'league_name':league_info['league_name'] , 'url':league_url,\
+					if enable_save:
+						dict_leagues_ready[sport_leag_countr_name] = {'league_name':league_info['league_name'] , 'url':league_url,\
 															 'league_id':league_id, 'season_id':league_info['season_id']}
 
 					print("league info to save in file json: ")
-					print(league_check_point[country_league])
+					print(dict_leagues_ready[sport_leag_countr_name])
+
+					# GET SECTIONS LINKS
 					dict_sections_links = get_sections_links(driver)
-					for section, url_section in dict_sections_links.items():
-						league_check_point[country_league][section] = url_section
-				json_check_point[sport] = league_check_point				
-				save_check_point('check_points/leagues_info.json', json_check_point)
+					for section, url_section in dict_sections_links.items():						
+						dict_leagues_ready[sport_leag_countr_name][section] = url_section
+
+				# SAVE JSON FILE WITH THE INFORMATION RELATED TO EACH LEAGUE
+				if enable_save:
+					dict_sport_info[sport_name] = dict_leagues_ready
+				save_check_point('check_points/leagues_info.json', dict_sport_info)
 				# stop_validate()
 
 def initial_settings_m2(driver):

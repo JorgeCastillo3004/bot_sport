@@ -26,6 +26,8 @@ time_difference_naive = utc_time_naive - local_time_naive
 def int_folders():
 	if not os.path.exists('check_points'):
 		os.mkdir('check_points')
+	if not os.path.exists('check_points/news/'):
+		os.mkdir("check_points/news/")
 	if not os.path.exists('check_points/results/'):
 		os.mkdir("check_points/results/")
 	if not os.path.exists('check_points/fixtures/'):
@@ -112,13 +114,14 @@ def check_previous_execution(file_path = 'check_points/scraper_control.json'):
 
 def launch_navigator(url, database_enable):
 	options = webdriver.ChromeOptions()
-	options.add_argument("--disable-blink-features=AutomationControlled") 
-	options.add_experimental_option("excludeSwitches", ["enable-automation"]) 
+	# options.add_argument("--disable-blink-features=AutomationControlled")     --
+	# options.add_experimental_option("excludeSwitches", ["enable-automation"]) ----
 	options.add_experimental_option("useAutomationExtension", False)
 	if database_enable:
 		options.add_argument('--headless')
 	options.add_argument('--no-sandbox')
-	options.add_argument('--disable-dev-shm-usage')
+	# options.add_argument('--disable-dev-shm-usage')  ---
+	options.add_argument('--disable-gpu')	
 	# chrome_path = os.getcwd()+'/chrome_files'
 	# print("chrome_path: ", chrome_path)
 	# options.add_argument(r"user-data-dir={}".format(chrome_path))
@@ -223,9 +226,21 @@ def random_name(folder = 'news_images', termination = '.jpg'):
 	file_name = ''.join(random.choice(string.ascii_lowercase) for i in range(16))
 	return os.path.join(folder,file_name + termination)
 
+def random_name_logos(league_team, folder = 'news_images', termination = '.jpg'):
+	file_name = ''.join(random.choice(string.ascii_lowercase) for i in range(4))
+	digits = ''.join([str(random.randint(0, 9)) for i in range(1)])
+	file_name = '_' + file_name + digits
+	league_team = '_'.join(league_team.replace('-', '_').replace('/', '_').lower().split())
+	return os.path.join(folder,(league_team) + file_name + termination)
+
 def random_id():
-	rand_id = ''.join(random.choice(string.ascii_lowercase) for i in range(16))
+	rand_id = ''.join(random.choice(string.ascii_lowercase) for i in range(4))
 	rand_id = rand_id + str(random.choice([0, 9]))
+	digits = ''.join([str(random.randint(0, 9)) for i in range(4)])
+	return rand_id+digits
+
+def random_id_short():
+	rand_id = ''.join(random.choice(string.ascii_lowercase) for i in range(4))
 	digits = ''.join([str(random.randint(0, 9)) for i in range(4)])
 	return rand_id+digits
 
