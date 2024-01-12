@@ -25,9 +25,10 @@ def get_player_data_tennis(driver):
 		player_dob = datetime.strptime('01.01.1900', "%d.%m.%Y") 
 
 	player_name = profile_block.find_element(By.XPATH, './/div[@class="heading__name"]').text
+	player_name = clean_field(player_name)
 
 	image_url = profile_block.find_element(By.XPATH, './/img').get_attribute('src')
-	image_path = random_name(folder = 'images/players/')
+	image_path = random_name_logos(player_name, folder = 'images/players/')	
 	save_image(driver, image_url, image_path)
 	player_photo = image_path.replace('images/players/','')
 	
@@ -110,27 +111,37 @@ def get_squad_list(driver, sport_id = 'barketball'):
     player_links = [link.get_attribute('href') for link in player_links]
     return player_links
 
-def navigate_through_players(driver, sport_id, country_league, team_name, season_id, team_id, list_squad):
+def navigate_through_players(driver, country_league, team_name, season_id, team_id, list_squad, global_check_point):
 
 	for player_link in list_squad:
-		wait_update_page(driver, player_link, 'container__heading')
-		player_dict = get_player_data(driver)			
-		player_dict['season_id'] = season_id
-		player_dict['team_id'] = team_id
-		player_dict['player_meta'] = ''			
-		print("Save player info in database")
-		# name_ = player_dict['player_country'] + '_' + player_dict['player_name']
-		print(player_dict)
-		print("Input name: ", player_dict['player_name'])
-		player_dict['player_name'] = player_dict['player_name'].replace("'", " ")
-		print("out name: ", player_dict['player_name'])
-		players_ready = check_player_duplicates(player_dict['player_country'], player_dict['player_name'], player_dict['player_dob'])
-		print("players_ready ", players_ready)
-		if len(players_ready) == 0:
-			# players_ready.append(name_)
-			if database_enable:
-				save_player_info(player_dict) # player
-				save_team_players_entity(player_dict) # team_players_entity
+		##########  ENABLE CHECK POINT PLAYER ############################
+		if global_check_point['M6']['player'] != '':
+			if global_check_point['M6']['player'] == player_link:
+				enable_player = True
+		else:
+			enable_player = True
+		#################################################################		
+
+		if enable_player:			
+			wait_update_page(driver, player_link, 'container__heading')
+			player_dict = get_player_data(driver)			
+			player_dict['season_id'] = season_id
+			player_dict['team_id'] = team_id
+			player_dict['player_meta'] = ''		
+			# name_ = player_dict['player_country'] + '_' + player_dict['player_name']		
+			player_dict['player_name'] = player_dict['player_name'].replace("'", " ")		
+			players_ready = check_player_duplicates(player_dict['player_country'], player_dict['player_name'], player_dict['player_dob'])
+			print('-e-', end = '')
+			if len(players_ready) == 0:
+				# players_ready.append(name_)
+				if database_enable:
+					save_player_info(player_dict) # player
+					save_team_players_entity(player_dict) # team_players_entity
+			global_check_point['M6']['player'] = player_link
+			save_check_point('check_points/global_check_point.json', global_check_point)
+	global_check_point['M6']['player'] = ''
+	save_check_point('check_points/global_check_point.json', global_check_point)
+		
 	# 	break
 	# break
 
@@ -150,7 +161,7 @@ def get_check_point(dict_players_ready, sport_id, country_league, team_name):
 		dict_players_ready[sport_id][country_league][team_name] = []
 	return dict_players_ready
 
-def players(driver, league_name):
+def players(driver, list_sports):
 	leagues_info_json = load_check_point('check_points/leagues_info.json')	
 	dict_sport_id = get_dict_sport_id()	# GET DICT SPORT FROM DATABASE
 	inverted_dict = {value: key for key, value in dict_sport_id.items()}
@@ -160,14 +171,16 @@ def players(driver, league_name):
 	#############################################################
 
 	global_check_point = load_check_point('check_points/global_check_point.json')
-	if 'M3' in global_check_point.keys():			
-		sport_point = global_check_point['sport']
-		league_point = global_check_point['league']
-		team_point  = global_check_point['team_name']
+	if 'M6' in global_check_point.keys():			
+		sport_point = global_check_point['M6']['sport']
+		league_point = global_check_point['M6']['league']
+		team_point  = global_check_point['M6']['team_name']		
 	else:
+		global_check_point['M6'] = {}
 		sport_point = ''
 		league_point = ''
 		team_point  = ''
+		global_check_point['M6']['player'] = ''
 
 	enable_sport = False
 	enable_league = False
@@ -177,6 +190,7 @@ def players(driver, league_name):
 	# 				MAIN LOOP OVER LIST SPORTS 					#
 	#############################################################
 	for sport_name in list_sports:		
+		print_section(sport_name, space_ = 50)
 		##########  ENABLE CHECK POINT SPORT #############
 		if sport_point != '':
 			if sport_point == sport_name:
@@ -185,66 +199,69 @@ def players(driver, league_name):
 			enable_sport = True
 		#################################################
 		if enable_sport:
-			for country_league, legue_info in leagues_info_json[sport_name].items():
+			print(leagues_info_json.keys())
+			global_check_point['M6']['sport'] = sport_name
+			for country_league, league_info in leagues_info_json[sport_name].items():
+				print_section(country_league, space_ = 30)
 				##########  ENABLE CHECK POINT LEAGUE #############
+				print("country_league: ", country_league)
 				if league_point != '':
 					if league_point == country_league:
 						enable_league = True
 				else:
 					enable_league = True
+				#################################################				
+				# for team_name, country_league_urls in league_info.items():
+				##########  ENABLE CHECK POINT LEAGUE #############
+				# if league_point != '':
+				# 	if league_point == country_league:
+				# 		enable_league = True
+				# else:
+				# 	enable_league = True
 				#################################################
+				path_leagues_teams_info = 'check_points/leagues_season/{}/{}.json'.format(sport_name, country_league)
+				
+				if os.path.isfile(path_leagues_teams_info) and enable_league:
+					print("Start extraction for league: ", country_league)
+					global_check_point['M6']['league'] = country_league
+					#############################################################
+					# 				LOAD TEAMS INFO 		 					#
+					#############################################################
+					dict_country_league_season = load_check_point(path_leagues_teams_info)
 
-				for country_league, country_league_urls in sport_dict.items():
-					##########  ENABLE CHECK POINT LEAGUE #############
-					if league_point != '':
-						if league_point == country_league:
-							enable_league = True
-					else:
-						enable_league = True
-					#################################################
-					path_leagues_teams_info = 'check_points/leagues_season/{}/{}_{}.json'.format(sport_name, sport_id, country_league)
-					print(path_leagues_teams_info)
-					
-					if os.path.isfile(path_leagues_teams_info) and enable_league:
-						print("Start extraction for league: ", country_league)
-
-						#############################################################
-						# 				LOAD TEAMS INFO 		 					#
-						#############################################################
-						dict_country_league_season = load_check_point(path_leagues_teams_info)
-
-						for team_name, team_info in dict_country_league_season.items():
-							##########  ENABLE CHECK POINT TEAM #############
-							if team_point != '':
-								if team_point == team_name:
-									enable_team = True
-							else:
+					for team_name, team_info in dict_country_league_season.items():
+						print_section(team_name, space_ = 20)
+						##########  ENABLE CHECK POINT TEAM #############
+						if team_point != '':
+							if team_point == team_name:
 								enable_team = True
-							#################################################
-							if enable_team:
-								# NAVIGATE THROUGH TEAMS
-								wait_update_page(driver, team_info['team_url'], "container__heading")
-								print(" START PLAYER EXTRACTION")
-								print(team_info['team_url'])
-								# LOAD SQUAD URL, LOADED FROM TEAM INFO
-								try:
-									squad_button = driver.find_element(By.CLASS_NAME, 'tabs__tab.squad')
-								except:
-									squad_button = driver.find_element(By.XPATH, '//a[@title="Squad"]')
-								squad_url = squad_button.get_attribute('href')
+						else:
+							enable_team = True
+						#################################################
+						if enable_team:
+							# NAVIGATE THROUGH TEAMS
+							global_check_point['M6']['team_name'] = team_name
+							wait_update_page(driver, team_info['team_url'], "container__heading")
+							print(" START PLAYER EXTRACTION")
+							print(team_info['team_url'])
+							# LOAD SQUAD URL, LOADED FROM TEAM INFO
+							try:
+								squad_button = driver.find_element(By.CLASS_NAME, 'tabs__tab.squad')
+							except:
+								squad_button = driver.find_element(By.XPATH, '//a[@title="Squad"]')
+							squad_url = squad_button.get_attribute('href')
 
-								# WAIT UNTIL COMPLETE LOAD
-								wait_update_page(driver, squad_url, 'heading')
-								# sport_name = inverted_dict[sport_id]						
-								print("squad_url URL: ", squad_url)
+							# WAIT UNTIL COMPLETE LOAD
+							wait_update_page(driver, squad_url, 'heading')
+							# sport_name = inverted_dict[sport_id]
 
-								# GET LIST OF PLAYERS AVAILABLES
-								list_squad = get_squad_list(driver, sport_id = sport_id)						
+							# GET LIST OF PLAYERS AVAILABLES
+							list_squad = get_squad_list(driver, sport_id = sport_name)
 
-								# NAVIGATE AND EXTRACT INFO FROM EACH PLAYER LINK
-								navigate_through_players(driver, sport_id, country_league, team_name, country_league_urls['season_id'],\
-													 team_info['team_id'], list_squad)
-								global_check_point['M6'] = {'sport':sport_name, 'league':country_league, 'team_name':team_name}
+							# NAVIGATE AND EXTRACT INFO FROM EACH PLAYER LINK
+							navigate_through_players(driver, country_league, team_name, league_info['season_id'],\
+												 team_info['team_id'], list_squad, global_check_point)
+							# global_check_point['M6'] = {'sport':sport_name, 'league':country_league, 'team_name':team_name}
 
 CONFIG = load_json('check_points/CONFIG.json')
 database_enable = CONFIG['DATA_BASE']

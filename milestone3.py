@@ -60,7 +60,7 @@ def get_teams_info_part2(driver, sport_id, league_id, season_id, team_info):
 	except:
 		team_country = block_ligue_team.find_element(By.XPATH, './/h2[@class= "breadcrumb"]/span[2]').text
 	team_name = block_ligue_team.find_element(By.CLASS_NAME,'heading__title').text
-
+	team_name = clean_field(team_name)	
 	try:
 		stadium = block_ligue_team.find_element(By.CLASS_NAME, 'heading__info').text
 	except:
@@ -116,9 +116,9 @@ def teams_creation(driver, list_sports):
 	dict_sport_id = get_dict_sport_id()	# GET DICT SPORT FROM DATABASE
 	global_check_point = load_check_point('check_points/global_check_point.json')
 	if 'M3' in global_check_point.keys():			
-		sport_point = global_check_point['sport']
-		league_point = global_check_point['league']
-		team_point  = global_check_point['team_name']
+		sport_point = global_check_point['M3']['sport']
+		league_point = global_check_point['M3']['league']
+		team_point  = global_check_point['M3']['team_name']
 	else:
 		sport_point = ''
 		league_point = ''
@@ -220,7 +220,7 @@ def teams_creation(driver, list_sports):
 								team_id = dict_teams_db[sport_id][team_country][team_name]['team_id']							
 							else:
 								if database_enable:
-									team_id_db = get_list_id_teams(sport_id, dict_team['team_country'], dict_team['team_name'])								
+									team_id_db = get_list_id_teams(sport_id, dict_team['team_country'], dict_team['team_name'])
 									if len(team_id_db) == 0:
 										save_team_info(dict_team)
 										save_league_team_entity(dict_team)								

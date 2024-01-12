@@ -38,7 +38,6 @@ def get_dict_sport_id():
 	dict_results = {row[0] : row[1] for row in cur.fetchall()}
 	return dict_results
 
-
 def save_league_info(dict_ligue_tornament):	
 	query = "INSERT INTO league VALUES(%(league_id)s, %(league_country)s, %(league_logo)s, %(league_name)s, %(league_name_i18n)s, %(sport_id)s)"
 	cur = con.cursor()																			 
@@ -108,7 +107,7 @@ def get_seasons(league_id, season_name):
 	return results
 
 def get_list_id_teams(sport_id, team_country, team_name):
-	query = "SELECT team_id FROM team WHERE sport_id ='{}' and team_country = '{}' and team_name = '{}';".format(sport_id, team_country, team_name)
+	query = """SELECT team_id FROM team WHERE sport_id ='{}' and team_country = '{}' and team_name = '{}';""".format(sport_id, team_country, team_name)
 	cur = con.cursor()
 	cur.execute(query)	
 	results = [row[0] for row in cur.fetchall()]
@@ -157,9 +156,10 @@ def get_dict_league_ready(sport_id = 'TENNIS'):
 
 	return dict_results
 
+######################################## FUNCTIONS RELATED TO MATCHS ########################################
 def save_math_info(dict_match):
 	query = "INSERT INTO match VALUES(%(match_id)s, %(match_country)s, %(end_time)s,\
-	 %(match_date)s, %(name)s, %(place)s, %(start_time)s, %(league_id)s, %(stadium_id)s, %(rounds)s ,%(season_id)s)"
+	 %(match_date)s, %(name)s, %(place)s, %(start_time)s, %(league_id)s, %(stadium_id)s, %(tournament_id)s,%(rounds)s ,%(season_id)s)"
 	cur = con.cursor()
 	cur.execute(query, dict_match)
 	con.commit()
@@ -199,6 +199,60 @@ def check_player_duplicates(player_country, player_name, player_dob):
 	cur.execute(query)	
 	results = [row[0] for row in cur.fetchall()]
 	return results
+
+def check_player_duplicates(player_country, player_name, player_dob):
+	query = "SELECT player_id FROM player WHERE player_country ='{}' AND player_name ='{}' AND player_dob ='{}';".format(player_country, player_name, player_dob)
+	cur = con.cursor()
+	cur.execute(query)	
+	results = [row[0] for row in cur.fetchall()]
+	return results
+
+def get_match_id(league_country, league_name, match_date, match_name):
+	
+	query = """
+	SELECT match.match_id
+	FROM match
+	JOIN league ON league.league_id = match.league_id
+	WHERE league.league_country = '{}' and 
+	league.league_name = '{}' and 
+	match.match_date = '{}' and match.name = '{}'""".format(league_country, league_name, match_date, match_name)
+	print(query)
+	cur = con.cursor()
+	cur.execute(query)
+	return cur.fetchone()
+
+# SELECT match.match_id
+# FROM match
+# JOIN league ON league.league_id = match.league_id
+# WHERE league.league_country = 'CZECH REPUBLIC' and 
+# league.league_name = 'Extraliga' and 
+# match.match_date = '2023-01-12' and match.name = 'Karlovy Vary-Trinec';
+def get_math_details_ids(match_id):
+	query = """
+	SELECT match_detail_id, home FROM match_detail
+	 WHERE match_id = '{}';""".format(match_id);
+	cur = con.cursor()
+	cur.execute(query)
+
+	dict_results = {row[0]:row[1] for row in cur.fetchall()}
+	return dict_results
+
+def update_score(params):
+	query = "UPDATE score_entity SET points = %(points)s WHERE match_detail_id = %(match_detail_id)s"
+	# query = "INSERT INTO score_entity VALUES(%(score_id)s, %(points)s, %(match_detail_id)s)"
+	cur = con.cursor()
+	cur.execute(query, params)
+	con.commit()
+
+	
+# Execute the query
+
+
+# Commit the changes
+
+
+
+
 
 
 if database_enable:
